@@ -46,6 +46,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- MapboxGL JS -->
+  <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js'></script>
+  <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css' rel='stylesheet' />
   <style>
     /* Custom styles to match React component's aesthetic */
     .gradient-bg {
@@ -60,6 +63,83 @@
     .disabled-button {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+    /* Map container styles */
+    .map-container {
+      position: relative;
+      width: 100%;
+      height: 500px;
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+    #weather-map {
+      width: 100%;
+      height: 100%;
+    }
+    /* Map legend styles */
+    .map-legend {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 12px;
+      z-index: 1;
+      max-width: 200px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+    }
+    .legend-color {
+      width: 30px;
+      height: 15px;
+      margin-right: 10px;
+      border-radius: 3px;
+    }
+    /* Loading overlay */
+    .map-loading {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      border-radius: 0.5rem;
+    }
+    .map-loading.hidden {
+      display: none;
+    }
+    /* Error state */
+    .map-error {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(239, 68, 68, 0.95);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      z-index: 2;
+    }
+    .map-error.hidden {
+      display: none;
+    }
+    /* Weather marker pulse animation */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .weather-marker {
+      animation: pulse 2s ease-in-out infinite;
     }
   </style>
 </head>
@@ -203,10 +283,51 @@
             </div>
           </div>
 
-          <div class="bg-gray-100 rounded-lg p-6 text-center">
-            <i data-lucide="map-pin" class="mx-auto text-gray-400 mb-3 w-12 h-12"></i>
-            <p class="text-gray-600">Interactive Weather Map</p>
-            <p class="text-sm text-gray-500 mt-2">Real-time cloud formation tracking across Northern Uganda</p>
+          <!-- Interactive Weather Map -->
+          <div class="map-container">
+            <!-- Loading State -->
+            <div id="map-loading" class="map-loading">
+              <div class="text-center text-white">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                <p class="text-sm">Loading weather data...</p>
+              </div>
+            </div>
+            
+            <!-- Error State -->
+            <div id="map-error" class="map-error hidden">
+              <i data-lucide="alert-triangle" class="w-8 h-8 mx-auto mb-2"></i>
+              <p class="font-semibold">Unable to load map</p>
+              <p class="text-sm mt-2">Please check your connection</p>
+              <button onclick="retryMapLoad()" class="mt-3 px-4 py-2 bg-white text-red-600 rounded-lg text-sm font-semibold hover:bg-gray-100">
+                Retry
+              </button>
+            </div>
+            
+            <!-- Map Container -->
+            <div id="weather-map"></div>
+            
+            <!-- Weather Data Legend -->
+            <div class="map-legend">
+              <h4 class="font-bold mb-3 text-sm">Weather Layer</h4>
+              <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(to right, #3b82f6, #1e40af);"></div>
+                <span>High Cloud Density</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(to right, #10b981, #059669);"></div>
+                <span>Moderate Humidity</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(to right, #f59e0b, #d97706);"></div>
+                <span>Low Precipitation</span>
+              </div>
+              <div class="mt-3 pt-3 border-t border-gray-600 text-xs">
+                <div class="flex items-center gap-2">
+                  <div class="w-2 h-2 bg-green-400 rounded-full weather-marker"></div>
+                  <span>Active Weather Stations</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -323,6 +444,281 @@
     // Initialize Lucide icons
     lucide.createIcons();
 
+    // MapboxGL Configuration
+    // Note: Using demo token - in production, replace with your own Mapbox token
+    // Get free token at: https://account.mapbox.com/
+    mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+    
+    let map = null;
+    let weatherDataInterval = null;
+
+    // Northern Uganda coordinates (Gulu region)
+    const NORTHERN_UGANDA = {
+      center: [32.2995, 2.7747], // Gulu coordinates
+      zoom: 8
+    };
+
+    // Weather stations in Northern Uganda
+    const weatherStations = [
+      { name: 'Gulu Station', coords: [32.2995, 2.7747], humidity: 82, clouds: 73 },
+      { name: 'Lira Station', coords: [32.8983, 2.2415], humidity: 78, clouds: 68 },
+      { name: 'Arua Station', coords: [30.9111, 3.0197], humidity: 85, clouds: 80 },
+      { name: 'Kitgum Station', coords: [32.8833, 3.2833], humidity: 76, clouds: 65 }
+    ];
+
+    // Initialize map when dashboard tab is shown
+    function initializeWeatherMap() {
+      if (map) return; // Map already initialized
+      
+      const mapContainer = document.getElementById('weather-map');
+      const loadingElement = document.getElementById('map-loading');
+      const errorElement = document.getElementById('map-error');
+      
+      try {
+        // Show loading state
+        loadingElement.classList.remove('hidden');
+        errorElement.classList.add('hidden');
+        
+        // Initialize Mapbox map
+        map = new mapboxgl.Map({
+          container: 'weather-map',
+          style: 'mapbox://styles/mapbox/dark-v11', // Dark theme
+          center: NORTHERN_UGANDA.center,
+          zoom: NORTHERN_UGANDA.zoom,
+          attributionControl: false
+        });
+
+        // Add navigation controls (zoom, rotate)
+        const nav = new mapboxgl.NavigationControl({
+          showCompass: true,
+          showZoom: true
+        });
+        map.addControl(nav, 'top-left');
+
+        // Add scale control
+        map.addControl(new mapboxgl.ScaleControl({
+          maxWidth: 100,
+          unit: 'metric'
+        }), 'bottom-left');
+
+        map.on('load', function() {
+          // Hide loading state
+          loadingElement.classList.add('hidden');
+          
+          // Add weather data sources and layers
+          addWeatherDataLayers();
+          
+          // Add weather station markers
+          addWeatherStations();
+          
+          // Start real-time data updates
+          startWeatherDataUpdates();
+        });
+
+        map.on('error', function(e) {
+          console.error('Map error:', e);
+          loadingElement.classList.add('hidden');
+          errorElement.classList.remove('hidden');
+          lucide.createIcons();
+        });
+
+      } catch (error) {
+        console.error('Failed to initialize map:', error);
+        loadingElement.classList.add('hidden');
+        errorElement.classList.remove('hidden');
+        lucide.createIcons();
+      }
+    }
+
+    // Add weather data visualization layers
+    function addWeatherDataLayers() {
+      // Simulated weather data - cloud formation areas
+      const weatherZones = {
+        'type': 'FeatureCollection',
+        'features': [
+          {
+            'type': 'Feature',
+            'properties': { 'density': 'high', 'type': 'cloud' },
+            'geometry': {
+              'type': 'Polygon',
+              'coordinates': [[
+                [32.1, 2.6], [32.4, 2.6], [32.4, 2.9], [32.1, 2.9], [32.1, 2.6]
+              ]]
+            }
+          },
+          {
+            'type': 'Feature',
+            'properties': { 'density': 'moderate', 'type': 'humidity' },
+            'geometry': {
+              'type': 'Polygon',
+              'coordinates': [[
+                [32.7, 2.1], [33.1, 2.1], [33.1, 2.4], [32.7, 2.4], [32.7, 2.1]
+              ]]
+            }
+          },
+          {
+            'type': 'Feature',
+            'properties': { 'density': 'low', 'type': 'precipitation' },
+            'geometry': {
+              'type': 'Polygon',
+              'coordinates': [[
+                [30.7, 2.9], [31.1, 2.9], [31.1, 3.2], [30.7, 3.2], [30.7, 2.9]
+              ]]
+            }
+          }
+        ]
+      };
+
+      // Add source
+      map.addSource('weather-data', {
+        'type': 'geojson',
+        'data': weatherZones
+      });
+
+      // Add layer with styling based on weather type
+      map.addLayer({
+        'id': 'weather-zones',
+        'type': 'fill',
+        'source': 'weather-data',
+        'paint': {
+          'fill-color': [
+            'match',
+            ['get', 'type'],
+            'cloud', '#3b82f6',
+            'humidity', '#10b981',
+            'precipitation', '#f59e0b',
+            '#6b7280'
+          ],
+          'fill-opacity': 0.4
+        }
+      });
+
+      // Add border to weather zones
+      map.addLayer({
+        'id': 'weather-zones-border',
+        'type': 'line',
+        'source': 'weather-data',
+        'paint': {
+          'line-color': [
+            'match',
+            ['get', 'type'],
+            'cloud', '#1e40af',
+            'humidity', '#059669',
+            'precipitation', '#d97706',
+            '#374151'
+          ],
+          'line-width': 2,
+          'line-opacity': 0.8
+        }
+      });
+
+      // Add popup on click
+      map.on('click', 'weather-zones', function(e) {
+        const properties = e.features[0].properties;
+        const typeLabel = properties.type.charAt(0).toUpperCase() + properties.type.slice(1);
+        const densityLabel = properties.density.charAt(0).toUpperCase() + properties.density.slice(1);
+        
+        new mapboxgl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(`
+            <div style="padding: 8px; color: #000;">
+              <strong>${typeLabel} Zone</strong><br/>
+              Density: ${densityLabel}<br/>
+              Status: Active
+            </div>
+          `)
+          .addTo(map);
+      });
+
+      // Change cursor on hover
+      map.on('mouseenter', 'weather-zones', function() {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'weather-zones', function() {
+        map.getCanvas().style.cursor = '';
+      });
+    }
+
+    // Add weather station markers
+    function addWeatherStations() {
+      weatherStations.forEach(station => {
+        // Create custom marker element
+        const el = document.createElement('div');
+        el.className = 'weather-marker';
+        el.style.width = '12px';
+        el.style.height = '12px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#10b981';
+        el.style.border = '2px solid #fff';
+        el.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.5)';
+        
+        // Create popup content
+        const popup = new mapboxgl.Popup({ offset: 15 }).setHTML(`
+          <div style="padding: 10px; color: #000;">
+            <strong>${station.name}</strong><br/>
+            <div style="margin-top: 5px; font-size: 12px;">
+              <div>☁️ Clouds: ${station.clouds}%</div>
+              <div>💧 Humidity: ${station.humidity}%</div>
+              <div style="margin-top: 5px; color: #059669;">● Active</div>
+            </div>
+          </div>
+        `);
+        
+        // Add marker to map
+        new mapboxgl.Marker(el)
+          .setLngLat(station.coords)
+          .setPopup(popup)
+          .addTo(map);
+      });
+    }
+
+    // Simulate real-time weather data updates
+    function startWeatherDataUpdates() {
+      // Update weather data every 10 seconds
+      weatherDataInterval = setInterval(() => {
+        if (!map || !map.getSource('weather-data')) return;
+        
+        // Simulate data changes by slightly modifying the weather zones
+        const currentData = map.getSource('weather-data')._data;
+        const updatedFeatures = currentData.features.map(feature => {
+          // Randomly adjust coordinates slightly to simulate cloud movement
+          const coords = feature.geometry.coordinates[0];
+          const adjustedCoords = coords.map(coord => [
+            coord[0] + (Math.random() - 0.5) * 0.02,
+            coord[1] + (Math.random() - 0.5) * 0.02
+          ]);
+          
+          return {
+            ...feature,
+            geometry: {
+              ...feature.geometry,
+              coordinates: [adjustedCoords]
+            }
+          };
+        });
+        
+        map.getSource('weather-data').setData({
+          'type': 'FeatureCollection',
+          'features': updatedFeatures
+        });
+      }, 10000);
+    }
+
+    // Retry map loading on error
+    function retryMapLoad() {
+      map = null;
+      document.getElementById('map-error').classList.add('hidden');
+      initializeWeatherMap();
+    }
+
+    // Clean up on tab switch
+    function cleanupMap() {
+      if (weatherDataInterval) {
+        clearInterval(weatherDataInterval);
+        weatherDataInterval = null;
+      }
+    }
+
     // Tab switching functionality
     function showTab(tabId) {
       // Hide all tab content
@@ -338,6 +734,13 @@
       });
       document.getElementById(`${tabId}-tab`).classList.remove('border-transparent', 'text-gray-600');
       document.getElementById(`${tabId}-tab`).classList.add('border-blue-600', 'text-blue-600');
+      
+      // Initialize map when dashboard tab is shown
+      if (tabId === 'dashboard') {
+        setTimeout(initializeWeatherMap, 100); // Small delay to ensure DOM is ready
+      } else {
+        cleanupMap();
+      }
     }
 
     // Form validation and button enabling
