@@ -146,7 +146,6 @@ This project is available under the MIT License. See LICENSE file for details.
 
 ## Contact
 Maintainer: @NAMATOVU-CHRISTINE  
-Email: (add your email here)
 
 ## Acknowledgements
 - Drone imagery processing libraries (e.g., OpenCV, GDAL, OpenDroneMap)
