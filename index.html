@@ -46,6 +46,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Maps API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&libraries=visualization"></script>
   <style>
     /* Custom styles to match React component's aesthetic */
     .gradient-bg {
@@ -60,6 +62,67 @@
     .disabled-button {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+    /* Google Maps Container */
+    #map-container {
+      width: 100%;
+      height: 500px;
+      position: relative;
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    /* Map Legend */
+    .map-legend {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(17, 24, 39, 0.9);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      color: white;
+      font-size: 0.875rem;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+    }
+    /* Loading Indicator */
+    .map-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(17, 24, 39, 0.9);
+      padding: 2rem;
+      border-radius: 0.5rem;
+      color: white;
+      z-index: 1001;
+    }
+    .spinner {
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -203,10 +266,31 @@
             </div>
           </div>
 
-          <div class="bg-gray-100 rounded-lg p-6 text-center">
-            <i data-lucide="map-pin" class="mx-auto text-gray-400 mb-3 w-12 h-12"></i>
-            <p class="text-gray-600">Interactive Weather Map</p>
-            <p class="text-sm text-gray-500 mt-2">Real-time cloud formation tracking across Northern Uganda</p>
+          <div id="map-container">
+            <div id="map"></div>
+            <div id="map-loading" class="map-loading">
+              <div class="spinner"></div>
+              <p class="text-center mt-4">Loading Weather Map...</p>
+            </div>
+            <div class="map-legend">
+              <h4 class="font-bold mb-3">Weather Data</h4>
+              <div class="legend-item">
+                <div class="legend-color" style="background: rgba(59, 130, 246, 0.6);"></div>
+                <span>Cloud Formation</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: rgba(34, 197, 94, 0.6);"></div>
+                <span>High Humidity</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: rgba(234, 179, 8, 0.6);"></div>
+                <span>Medium Humidity</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: rgba(239, 68, 68, 0.6);"></div>
+                <span>Low Humidity</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -421,6 +505,236 @@
         btn.classList.remove('disabled-button');
       }, 2000);
     }
+
+    // Google Maps Weather Integration
+    let map;
+    let weatherLayer;
+    let heatmapLayer;
+
+    function initMap() {
+      // Northern Uganda coordinates (centered on Gulu)
+      const northernUganda = { lat: 2.7747, lng: 32.2989 };
+
+      // Dark theme map styles
+      const darkMapStyles = [
+        { elementType: "geometry", stylers: [{ color: "#212121" }] },
+        { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+        { elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
+        { elementType: "labels.text.stroke", stylers: [{ color: "#212121" }] },
+        {
+          featureType: "administrative",
+          elementType: "geometry",
+          stylers: [{ color: "#757575" }],
+        },
+        {
+          featureType: "administrative.country",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#9e9e9e" }],
+        },
+        {
+          featureType: "administrative.land_parcel",
+          stylers: [{ visibility: "off" }],
+        },
+        {
+          featureType: "administrative.locality",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#bdbdbd" }],
+        },
+        {
+          featureType: "poi",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#757575" }],
+        },
+        {
+          featureType: "poi.park",
+          elementType: "geometry",
+          stylers: [{ color: "#181818" }],
+        },
+        {
+          featureType: "poi.park",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#616161" }],
+        },
+        {
+          featureType: "poi.park",
+          elementType: "labels.text.stroke",
+          stylers: [{ color: "#1b1b1b" }],
+        },
+        {
+          featureType: "road",
+          elementType: "geometry.fill",
+          stylers: [{ color: "#2c2c2c" }],
+        },
+        {
+          featureType: "road",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#8a8a8a" }],
+        },
+        {
+          featureType: "road.arterial",
+          elementType: "geometry",
+          stylers: [{ color: "#373737" }],
+        },
+        {
+          featureType: "road.highway",
+          elementType: "geometry",
+          stylers: [{ color: "#3c3c3c" }],
+        },
+        {
+          featureType: "road.highway.controlled_access",
+          elementType: "geometry",
+          stylers: [{ color: "#4e4e4e" }],
+        },
+        {
+          featureType: "road.local",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#616161" }],
+        },
+        {
+          featureType: "transit",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#757575" }],
+        },
+        {
+          featureType: "water",
+          elementType: "geometry",
+          stylers: [{ color: "#000000" }],
+        },
+        {
+          featureType: "water",
+          elementType: "labels.text.fill",
+          stylers: [{ color: "#3d3d3d" }],
+        },
+      ];
+
+      // Initialize map
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: northernUganda,
+        zoom: 8,
+        styles: darkMapStyles,
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+          style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+          mapTypeIds: ["roadmap", "satellite", "hybrid", "terrain"],
+        },
+        zoomControl: true,
+        zoomControlOptions: {
+          position: google.maps.ControlPosition.RIGHT_CENTER,
+        },
+        streetViewControl: false,
+        fullscreenControl: true,
+      });
+
+      // Add weather markers for key locations
+      addWeatherMarkers();
+
+      // Add cloud formation heatmap
+      addWeatherHeatmap();
+
+      // Hide loading indicator
+      setTimeout(() => {
+        document.getElementById('map-loading').style.display = 'none';
+      }, 1500);
+    }
+
+    function addWeatherMarkers() {
+      const weatherLocations = [
+        { name: "Gulu", lat: 2.7747, lng: 32.2989, cloud: 75, humidity: 85 },
+        { name: "Lira", lat: 2.2499, lng: 32.8998, cloud: 68, humidity: 78 },
+        { name: "Arua", lat: 3.0197, lng: 30.9108, cloud: 82, humidity: 88 },
+        { name: "Kitgum", lat: 3.2817, lng: 32.8864, cloud: 71, humidity: 80 },
+        { name: "Pader", lat: 2.8481, lng: 32.9486, cloud: 77, humidity: 82 },
+      ];
+
+      weatherLocations.forEach((location) => {
+        // Create custom marker icon with cloud data
+        const svgMarker = {
+          path: "M10 2C8.9 2 8 2.9 8 4C7 4 6 5 6 6C6 7 7 8 8 8H14C15 8 16 7 16 6C16 5 15 4 14 4C14 2.9 13.1 2 12 2H10Z",
+          fillColor: location.cloud > 75 ? "#3b82f6" : "#22c55e",
+          fillOpacity: 0.8,
+          strokeWeight: 1,
+          strokeColor: "#ffffff",
+          rotation: 0,
+          scale: 2,
+          anchor: new google.maps.Point(11, 11),
+        };
+
+        const marker = new google.maps.Marker({
+          position: { lat: location.lat, lng: location.lng },
+          map: map,
+          icon: svgMarker,
+          title: location.name,
+        });
+
+        // Add info window
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="color: #1f2937; padding: 8px;">
+              <h3 style="font-weight: bold; margin-bottom: 8px;">${location.name}</h3>
+              <p style="margin: 4px 0;">Cloud Coverage: ${location.cloud}%</p>
+              <p style="margin: 4px 0;">Humidity: ${location.humidity}%</p>
+              <p style="margin: 4px 0; color: #22c55e; font-weight: 600;">
+                ${location.cloud > 70 && location.humidity > 75 ? '✓ Seeding Viable' : '⚠ Monitor Conditions'}
+              </p>
+            </div>
+          `,
+        });
+
+        marker.addListener("click", () => {
+          infoWindow.open(map, marker);
+        });
+      });
+    }
+
+    function addWeatherHeatmap() {
+      // Generate weather data points for heatmap
+      const heatmapData = [];
+      const centerLat = 2.7747;
+      const centerLng = 32.2989;
+
+      // Create a grid of weather data points
+      for (let i = 0; i < 50; i++) {
+        const latOffset = (Math.random() - 0.5) * 2;
+        const lngOffset = (Math.random() - 0.5) * 2;
+        const weight = Math.random() * 100;
+
+        heatmapData.push({
+          location: new google.maps.LatLng(
+            centerLat + latOffset,
+            centerLng + lngOffset
+          ),
+          weight: weight,
+        });
+      }
+
+      // Create heatmap layer
+      heatmapLayer = new google.maps.visualization.HeatmapLayer({
+        data: heatmapData,
+        map: map,
+        radius: 30,
+        opacity: 0.6,
+        gradient: [
+          "rgba(0, 0, 0, 0)",
+          "rgba(239, 68, 68, 0.6)",
+          "rgba(234, 179, 8, 0.6)",
+          "rgba(34, 197, 94, 0.6)",
+          "rgba(59, 130, 246, 0.6)",
+        ],
+      });
+    }
+
+    // Initialize map when dashboard tab is shown
+    let mapInitialized = false;
+    const originalShowTab = showTab;
+    showTab = function(tabId) {
+      originalShowTab(tabId);
+      if (tabId === 'dashboard' && !mapInitialized) {
+        setTimeout(() => {
+          initMap();
+          mapInitialized = true;
+        }, 100);
+      }
+    };
   </script>
 </body>
 </html>
