@@ -1,0 +1,426 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Droni Kilimo Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Custom styles to match React component's aesthetic */
+    .gradient-bg {
+      background: linear-gradient(to bottom right, #EFF6FF, #F0FFF4);
+    }
+    .header-gradient {
+      background: linear-gradient(to right, #2563EB, #16A34A);
+    }
+    .nav-border {
+      border-bottom-width: 2px;
+    }
+    .disabled-button {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body class="min-h-screen gradient-bg">
+  <!-- Header -->
+  <header class="header-gradient text-white shadow-lg">
+    <div class="max-w-6xl mx-auto px-4 py-6">
+      <div class="flex items-center gap-3">
+        <i data-lucide="cloud" class="w-10 h-10"></i>
+        <div>
+          <h1 class="text-3xl font-bold">Droni Kilimo</h1>
+          <p class="text-blue-100 text-sm">Uganda's Clean Cloud Seeding Platform</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="bg-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="flex gap-6">
+        <button onclick="showTab('request')" class="py-4 px-2 nav-border font-medium transition border-blue-600 text-blue-600" id="request-tab">
+          SACCO Request Portal
+        </button>
+        <button onclick="showTab('dashboard')" class="py-4 px-2 nav-border font-medium transition border-transparent text-gray-600 hover:text-blue-600" id="dashboard-tab">
+          Weather AI Dashboard
+        </button>
+        <button onclick="showTab('missions')" class="py-4 px-2 nav-border font-medium transition border-transparent text-gray-600 hover:text-blue-600" id="missions-tab">
+          Operations Center
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    <!-- SACCO Request Portal -->
+    <div id="request" class="tab-content">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+          <i data-lucide="users" class="text-green-600"></i>
+          SACCO Mission Request
+        </h2>
+        
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">SACCO Name</label>
+            <select id="sacco" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Select SACCO</option>
+              <option value="Acholi Farmers SACCO">Acholi Farmers SACCO</option>
+              <option value="Lango Agricultural Cooperative">Lango Agricultural Cooperative</option>
+              <option value="West Nile Growers Union">West Nile Growers Union</option>
+              <option value="Gulu District SACCO">Gulu District SACCO</option>
+              <option value="Kitgum Farmers Group">Kitgum Farmers Group</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Region</label>
+            <select id="region" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Select Region</option>
+              <option value="Acholi">Acholi</option>
+              <option value="Lango">Lango</option>
+              <option value="West Nile">West Nile</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Target Location</label>
+            <input type="text" id="location" placeholder="e.g., Gulu District" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Preferred Date</label>
+            <input type="date" id="date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Crop Type</label>
+            <select id="cropType" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Select Crop</option>
+              <option value="Maize">Maize</option>
+              <option value="Cassava">Cassava</option>
+              <option value="Beans">Beans</option>
+              <option value="Sorghum">Sorghum</option>
+              <option value="Millet">Millet</option>
+              <option value="Groundnuts">Groundnuts</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Farm Acreage</label>
+            <input type="number" id="acreage" placeholder="Total acres" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          </div>
+        </div>
+
+        <button id="feasibility-btn" onclick="checkMissionFeasibility()" class="w-full bg-gradient-to-r from-blue-600 to-green-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-green-700 disabled-button" disabled>
+          Check Mission Feasibility
+        </button>
+
+        <!-- Mission Result -->
+        <div id="mission-result" class="hidden mt-6 p-6 rounded-lg border-2"></div>
+      </div>
+    </div>
+
+    <!-- Weather AI Dashboard -->
+    <div id="dashboard" class="tab-content hidden">
+      <div class="space-y-6">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <i data-lucide="zap" class="text-yellow-600"></i>
+            AI Weather Targeting System
+          </h2>
+          
+          <div class="grid md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="cloud" class="text-blue-600"></i>
+                <h3 class="font-semibold">Cloud Viability</h3>
+              </div>
+              <p class="text-3xl font-bold text-blue-600">73%</p>
+              <p class="text-sm text-gray-600">Acholi Region</p>
+            </div>
+
+            <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+              <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="droplets" class="text-green-600"></i>
+                <h3 class="font-semibold">Humidity Index</h3>
+              </div>
+              <p class="text-3xl font-bold text-green-600">82%</p>
+              <p class="text-sm text-gray-600">Optimal Range</p>
+            </div>
+
+            <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="radio" class="text-purple-600"></i>
+                <h3 class="font-semibold">CubeSat Link</h3>
+              </div>
+              <p class="text-3xl font-bold text-purple-600">Active</p>
+              <p class="text-sm text-gray-600">Live Data Feed</p>
+            </div>
+          </div>
+
+          <div class="bg-gray-100 rounded-lg p-6 text-center">
+            <i data-lucide="map-pin" class="mx-auto text-gray-400 mb-3 w-12 h-12"></i>
+            <p class="text-gray-600">Interactive Weather Map</p>
+            <p class="text-sm text-gray-500 mt-2">Real-time cloud formation tracking across Northern Uganda</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operations Center -->
+    <div id="missions" class="tab-content hidden">
+      <div class="space-y-6">
+        <!-- UAV Fleet Status -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-4">UAV Fleet Status</h2>
+          <div class="grid md:grid-cols-4 gap-4">
+            <div class="border rounded-lg p-4">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-bold">UAV-01</span>
+                <span class="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700">active</span>
+              </div>
+              <div class="text-sm text-gray-600">
+                <p>Battery: 85%</p>
+                <p class="flex items-center gap-1 mt-1">
+                  <i data-lucide="map-pin" class="w-4 h-4"></i> Gulu Base
+                </p>
+              </div>
+            </div>
+            <div class="border rounded-lg p-4">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-bold">UAV-02</span>
+                <span class="px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-700">charging</span>
+              </div>
+              <div class="text-sm text-gray-600">
+                <p>Battery: 45%</p>
+                <p class="flex items-center gap-1 mt-1">
+                  <i data-lucide="map-pin" class="w-4 h-4"></i> Lira Station
+                </p>
+              </div>
+            </div>
+            <div class="border rounded-lg p-4">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-bold">UAV-03</span>
+                <span class="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700">active</span>
+              </div>
+              <div class="text-sm text-gray-600">
+                <p>Battery: 92%</p>
+                <p class="flex items-center gap-1 mt-1">
+                  <i data-lucide="map-pin" class="w-4 h-4"></i> Arua Hub
+                </p>
+              </div>
+            </div>
+            <div class="border rounded-lg p-4">
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-bold">UAV-04</span>
+                <span class="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700">maintenance</span>
+              </div>
+              <div class="text-sm text-gray-600">
+                <p>Battery: 0%</p>
+                <p class="flex items-center gap-1 mt-1">
+                  <i data-lucide="map-pin" class="w-4 h-4"></i> Gulu Base
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mission History -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-4">Recent Missions</h2>
+          <div class="space-y-3">
+            <div class="border rounded-lg p-4 flex justify-between items-center">
+              <div>
+                <p class="font-semibold">Acholi Farmers SACCO</p>
+                <p class="text-sm text-gray-600">Acholi • 2025-10-18</p>
+              </div>
+              <div class="text-right">
+                <span class="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">completed</span>
+                <p class="text-sm text-gray-600 mt-1">Rainfall: 12mm</p>
+              </div>
+            </div>
+            <div class="border rounded-lg p-4 flex justify-between items-center">
+              <div>
+                <p class="font-semibold">Lango Agricultural Cooperative</p>
+                <p class="text-sm text-gray-600">Lango • 2025-10-20</p>
+              </div>
+              <div class="text-right">
+                <span class="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">completed</span>
+                <p class="text-sm text-gray-600 mt-1">Rainfall: 8mm</p>
+              </div>
+            </div>
+            <div class="border rounded-lg p-4 flex justify-between items-center">
+              <div>
+                <p class="font-semibold">West Nile Growers Union</p>
+                <p class="text-sm text-gray-600">West Nile • 2025-10-21</p>
+              </div>
+              <div class="text-right">
+                <span class="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">in-progress</span>
+                <p class="text-sm text-gray-600 mt-1">Rainfall: pending</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-white mt-12 py-6">
+    <div class="max-w-6xl mx-auto px-4 text-center">
+      <p class="font-semibold">Droni Kilimo - Making Rain a Service</p>
+      <p class="text-sm text-gray-400 mt-2">Empowering 2M+ farmers across Northern Uganda</p>
+      <p class="text-xs text-gray-500 mt-4">Demo Platform • October 2025</p>
+    </div>
+  </footer>
+
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // Tab switching functionality
+    function showTab(tabId) {
+      // Hide all tab content
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+      });
+      // Show selected tab
+      document.getElementById(tabId).classList.remove('hidden');
+      // Update button styles
+      document.querySelectorAll('nav button').forEach(btn => {
+        btn.classList.remove('border-blue-600', 'text-blue-600');
+        btn.classList.add('border-transparent', 'text-gray-600', 'hover:text-blue-600');
+      });
+      document.getElementById(`${tabId}-tab`).classList.remove('border-transparent', 'text-gray-600');
+      document.getElementById(`${tabId}-tab`).classList.add('border-blue-600', 'text-blue-600');
+    }
+
+    // Form validation and button enabling
+    const formInputs = ['sacco', 'region', 'date'];
+    formInputs.forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        const allFilled = formInputs.every(id => document.getElementById(id).value);
+        const btn = document.getElementById('feasibility-btn');
+        btn.disabled = !allFilled;
+        btn.classList.toggle('disabled-button', !allFilled);
+      });
+    });
+
+    // Mission feasibility check
+    function checkMissionFeasibility() {
+      const btn = document.getElementById('feasibility-btn');
+      btn.textContent = 'Analyzing Weather Conditions...';
+      btn.disabled = true;
+      btn.classList.add('disabled-button');
+
+      setTimeout(() => {
+        const cloudCoverage = (Math.random() * 100).toFixed(1);
+        const humidity = (65 + Math.random() * 30).toFixed(1);
+        const temperature = (22 + Math.random() * 8).toFixed(1);
+        const windSpeed = (Math.random() * 15).toFixed(1);
+        const acreage = parseFloat(document.getElementById('acreage').value) || 0;
+        const feasible = cloudCoverage > 40 && humidity > 70 && windSpeed < 12;
+
+        const resultDiv = document.getElementById('mission-result');
+        resultDiv.classList.remove('hidden');
+        resultDiv.className = `mt-6 p-6 rounded-lg border-2 ${feasible ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`;
+
+        resultDiv.innerHTML = `
+          <div class="flex items-center gap-3 mb-4">
+            ${feasible ? 
+              '<i data-lucide="check-circle" class="text-green-600 w-8 h-8"></i>' : 
+              '<i data-lucide="x-circle" class="text-red-600 w-8 h-8"></i>'
+            }
+            <h3 class="text-xl font-bold">${feasible ? 'Mission FEASIBLE ✓' : 'Mission NOT FEASIBLE ✗'}</h3>
+          </div>
+          <div class="grid md:grid-cols-2 gap-4 text-sm">
+            <div class="flex justify-between">
+              <span class="font-medium">Cloud Coverage:</span>
+              <span>${cloudCoverage}%</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-medium">Humidity:</span>
+              <span>${humidity}%</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-medium">Temperature:</span>
+              <span>${temperature}°C</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="font-medium">Wind Speed:</span>
+              <span>${windSpeed} km/h</span>
+            </div>
+            ${feasible ? `
+              <div class="flex justify-between">
+                <span class="font-medium">UAVs Required:</span>
+                <span>${Math.ceil(acreage / 500)} drones</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="font-medium">Estimated Rainfall:</span>
+                <span>${(8 + Math.random() * 7).toFixed(1)}mm</span>
+              </div>
+              <div class="flex justify-between col-span-2">
+                <span class="font-medium">Mission Window:</span>
+                <span>21:00 - 23:30 (Night Mission)</span>
+              </div>
+              <button class="mt-4 w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition">
+                Confirm Mission Request
+              </button>
+            ` : ''}
+          </div>
+        `;
+
+        lucide.createIcons(); // Re-render icons in dynamically added content
+        btn.textContent = 'Check Mission Feasibility';
+        btn.disabled = false;
+        btn.classList.remove('disabled-button');
+      }, 2000);
+    }
+  </script>
+</body>
+</html>
