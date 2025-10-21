@@ -422,5 +422,42 @@
       }, 2000);
     }
   </script>
+        // Add this before the closing </script> tag
+// Initialize Google Maps
+function initMap() {
+  // Center on Northern Uganda
+  const northernUganda = { lat: 3.0, lng: 32.5 };
+  
+  const map = new google.maps.Map(document.getElementById("weather-map"), {
+    zoom: 7,
+    center: northernUganda,
+    mapTypeId: "terrain",
+    styles: [
+      {
+        featureType: "landscape",
+        stylers: [{ visibility: "on" }, { color: "#f7f7f7" }],
+      },
+      {
+        featureType: "water",
+        stylers: [{ visibility: "on" }, { color: "#d4f1f9" }],
+      },
+    ],
+  });
+
+  // Add cloud coverage overlay (placeholder)
+  const cloudOverlay = new google.maps.Circle({
+    strokeColor: "#1E40AF",
+    strokeOpacity: 0.8,
+    strokeWeight: 2,
+    fillColor: "#60A5FA",
+    fillOpacity: 0.35,
+    map,
+    center: northernUganda,
+    radius: 100000,
+  });
+}
+
+// Call initMap when the page loads
+window.addEventListener("load", initMap);
 </body>
 </html>
