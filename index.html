@@ -203,11 +203,7 @@
             </div>
           </div>
 
-          <div class="bg-gray-100 rounded-lg p-6 text-center">
-            <i data-lucide="map-pin" class="mx-auto text-gray-400 mb-3 w-12 h-12"></i>
-            <p class="text-gray-600">Interactive Weather Map</p>
-            <p class="text-sm text-gray-500 mt-2">Real-time cloud formation tracking across Northern Uganda</p>
-          </div>
+          <div id="map" class="rounded-lg" style="height: 400px; width: 100%;"></div>
         </div>
       </div>
     </div>
@@ -421,6 +417,36 @@
         btn.classList.remove('disabled-button');
       }, 2000);
     }
+
+    // Initialize Google Maps
+    function initMap() {
+      // Center on Northern Uganda (approximately Gulu)
+      const northernUganda = { lat: 2.7742, lng: 32.2992 };
+      
+      const map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 8,
+        center: northernUganda,
+        mapTypeId: 'terrain'
+      });
+      
+      // Add markers for key locations
+      const locations = [
+        { name: "Gulu Base", lat: 2.7742, lng: 32.2992 },
+        { name: "Lira Station", lat: 2.2397, lng: 32.8985 },
+        { name: "Arua Hub", lat: 3.0197, lng: 30.9107 }
+      ];
+      
+      locations.forEach(location => {
+        new google.maps.Marker({
+          position: { lat: location.lat, lng: location.lng },
+          map: map,
+          title: location.name
+        });
+      });
+    }
   </script>
+
+  <!-- Google Maps API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap" async defer></script>
 </body>
 </html>
