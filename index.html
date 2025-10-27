@@ -46,6 +46,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Maps JavaScript API -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB41DRUbKWJHPxaFjMAwdrzWzbVKartNGg&callback=initMap"></script>
   <style>
     /* Custom styles to match React component's aesthetic */
     .gradient-bg {
@@ -60,6 +62,11 @@
     .disabled-button {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+    #map {
+      height: 500px;
+      width: 100%;
+      border-radius: 0.5rem;
     }
   </style>
 </head>
@@ -203,11 +210,7 @@
             </div>
           </div>
 
-          <div class="bg-gray-100 rounded-lg p-6 text-center">
-            <i data-lucide="map-pin" class="mx-auto text-gray-400 mb-3 w-12 h-12"></i>
-            <p class="text-gray-600">Interactive Weather Map</p>
-            <p class="text-sm text-gray-500 mt-2">Real-time cloud formation tracking across Northern Uganda</p>
-          </div>
+          <div id="map"></div>
         </div>
       </div>
     </div>
@@ -320,6 +323,58 @@
   </footer>
 
   <script>
+    // Initialize Google Maps
+    let map;
+    
+    function initMap() {
+      // Northern Uganda coordinates (centered on Gulu)
+      const northernUganda = { lat: 2.7748, lng: 32.2990 };
+      
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: northernUganda,
+        zoom: 9,
+        mapTypeId: 'terrain',
+        zoomControl: true,
+        zoomControlOptions: {
+          position: google.maps.ControlPosition.RIGHT_CENTER
+        },
+        streetViewControl: false,
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+          style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+          position: google.maps.ControlPosition.TOP_RIGHT
+        },
+        fullscreenControl: true,
+        fullscreenControlOptions: {
+          position: google.maps.ControlPosition.RIGHT_TOP
+        }
+      });
+      
+      // Add a marker for Gulu (main operational base)
+      const guluMarker = new google.maps.Marker({
+        position: northernUganda,
+        map: map,
+        title: "Gulu - Main Operations Base",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#2563EB",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2
+        }
+      });
+      
+      // Add info window
+      const infoWindow = new google.maps.InfoWindow({
+        content: "<div style='padding: 10px;'><h3 style='font-weight: bold; margin-bottom: 5px;'>Gulu Operations Base</h3><p style='font-size: 14px;'>Northern Uganda - Cloud Seeding Coverage Area</p></div>"
+      });
+      
+      guluMarker.addListener("click", () => {
+        infoWindow.open(map, guluMarker);
+      });
+    }
+
     // Initialize Lucide icons
     lucide.createIcons();
 
